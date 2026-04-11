@@ -1,0 +1,14 @@
+# Claude Code files
+.claude/
+
+# Cache directories
+cache/
+writeup/cache/
+
+# R session data
+.Rhistory
+.RData
+.Rproj.user/
+
+# macOS
+.DS_Store
