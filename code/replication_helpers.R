@@ -37,7 +37,7 @@ standalone_output_path <- function(filename) {
 TREATMENT_YEAR <- 1990
 REFERENCE_YEAR <- TREATMENT_YEAR - 1
 PRE_TREATMENT_YEARS <- 1960:REFERENCE_YEAR
-POST_TREATMENT_YEARS <- (TREATMENT_YEAR + 1):2005
+POST_TREATMENT_YEARS <- TREATMENT_YEAR:2005
 PLOT_YEARS <- 1960:2005
 YEAR_BREAKS <- c(1960, 1970, 1980, 1990, 2000)
 
@@ -407,20 +407,26 @@ build_did_results <- function(panel_data) {
       "Clustered by Year",
       "Two-Way Clustered (Country and Year)"
     ),
-    Estimate = coef(twfe)["treated"],
-    `Std. Error` = c(
+    Estimate = round(coef(twfe)["treated"], 4),
+    `Std. Error` = round(c(
       se_conv$se["treated"],
       se_hc$se["treated"],
       se_year$se["treated"],
       se_twoway$se["treated"]
-    )
-  ) |>
-    mutate(
-      `t-stat` = round(Estimate / `Std. Error`, 2),
-      `p-value` = round(2 * pt(-abs(`t-stat`), df = twfe$nobs - 1), 4),
-      Estimate = round(Estimate, 4),
-      `Std. Error` = round(`Std. Error`, 4)
-    )
+    ), 4),
+    `t-stat` = round(c(
+      se_conv$coeftable["treated", "t value"],
+      se_hc$coeftable["treated", "t value"],
+      se_year$coeftable["treated", "t value"],
+      se_twoway$coeftable["treated", "t value"]
+    ), 2),
+    `p-value` = round(c(
+      se_conv$coeftable["treated", "Pr(>|t|)"],
+      se_hc$coeftable["treated", "Pr(>|t|)"],
+      se_year$coeftable["treated", "Pr(>|t|)"],
+      se_twoway$coeftable["treated", "Pr(>|t|)"]
+    ), 4)
+  )
 
   list(model = twfe, table = did_table)
 }
@@ -497,27 +503,57 @@ build_rdit_results <- function(sweden_ts) {
 }
 
 add_rdit_fits <- function(sweden_ts, degrees = c(7, 9)) {
-  fitted_data <- sweden_ts
+  # One extra row at the cutoff with D = 0 (counterfactual).
+  # Evaluating the pre-treatment polynomial at t_pre = 0 extends the curve
+  # to exactly 1990, so the gap between the pre-treatment endpoint and the
+  # post-treatment start equals alpha (the estimated treatment effect).
+  cutoff_cf <- sweden_ts |>
+    filter(year == TREATMENT_YEAR) |>
+    mutate(D = 0L, series = "counterfactual")
+
+  fitted_data <- sweden_ts |> mutate(series = "actual")
 
   for (degree in degrees) {
-    model <- lm(build_rdit_formula(degree), data = fitted_data)
-    fitted_data[[paste0("fitted_n", degree)]] <- predict(model, newdata = fitted_data)
+    col   <- paste0("fitted_n", degree)
+    model <- lm(build_rdit_formula(degree), data = sweden_ts)
+    fitted_data[[col]] <- predict(model, newdata = sweden_ts)
+    cutoff_cf[[col]]   <- predict(model, newdata = cutoff_cf)
   }
 
-  fitted_data
+  bind_rows(fitted_data, cutoff_cf) |> arrange(year, D)
 }
 
 plot_rdit <- function(sweden_ts) {
-  ggplot(sweden_ts, aes(x = year)) +
-    geom_point(aes(y = CO2_transport_capita), color = "black", size = 2, alpha = 0.7) +
-    geom_line(aes(y = fitted_n7, linetype = "n = 7"), color = "black", linewidth = 1) +
-    geom_line(aes(y = fitted_n9, linetype = "n = 9"), color = "gray50", linewidth = 1) +
+  # Reshape to long format. Each curve has two groups:
+  #   pre  — D = 0 (years 1960–1989 actual + 1990 counterfactual endpoint)
+  #   post — D = 1 (years 1990–2005 actual)
+  # The gap at x = 1990 between the pre endpoint and the post start equals alpha.
+  fit_long <- sweden_ts |>
+    select(year, D, fitted_n7, fitted_n9) |>
+    pivot_longer(c(fitted_n7, fitted_n9),
+                 names_to  = "degree",
+                 values_to = "fitted") |>
+    mutate(
+      label = if_else(degree == "fitted_n7", "n = 7", "n = 9"),
+      grp   = paste0(label, "_", if_else(D == 0L, "pre", "post"))
+    )
+
+  ggplot() +
+    geom_point(data = filter(sweden_ts, series == "actual"),
+               aes(x = year, y = CO2_transport_capita),
+               color = "black", size = 2, alpha = 0.7) +
+    geom_line(data = fit_long,
+              aes(x = year, y = fitted,
+                  color = label, linetype = label, group = grp),
+              linewidth = 0.8) +
     geom_vline(xintercept = TREATMENT_YEAR, linetype = "dotted", color = "black") +
+    scale_color_manual(values = c("n = 7" = "black", "n = 9" = "blue3")) +
+    scale_linetype_manual(values = c("n = 7" = "solid", "n = 9" = "solid")) +
     scale_x_continuous(breaks = YEAR_BREAKS) +
-    scale_linetype_manual(values = c("n = 7" = "solid", "n = 9" = "dashed")) +
     labs(
-      x = "Year",
-      y = "CO2 emissions per capita (metric tons)",
+      x        = "Year",
+      y        = "CO2 emissions per capita (metric tons)",
+      color    = "Polynomial degree",
       linetype = "Polynomial degree"
     ) +
     paper_theme()

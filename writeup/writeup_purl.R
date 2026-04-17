@@ -49,6 +49,7 @@ gap_data <- build_synth_gap_data(synth_results)
 tab1 <- build_synth_balance_table(synth_tables, analysis, population)
 
 kable(tab1, booktabs = TRUE, escape = FALSE,
+      longtable = FALSE,
       align  = "lccc",
       linesep = "",
       col.names = c("Variables", "Sweden", "Synth. Sweden", "OECD sample"),
@@ -56,23 +57,28 @@ kable(tab1, booktabs = TRUE, escape = FALSE,
   style_paper_table(
     note = paste(
       paste("All variables except lagged", CO2_LABEL, "are averaged for the period 1980--1989."),
-      "GDP per capita is PPP-adjusted in 2005 US dollars.",
-      "Gasoline consumption is in kg of oil equivalent.",
-      "Urban population is percentage of total population.",
-      paste(CO2_LABEL, "emissions in metric tons."),
-      "Last column: population-weighted averages of the 14 donor countries."
-    )
+      "GDP per capita is purchasing power parity (PPP)--adjusted and measured in 2005 US dollars.",
+      "Gasoline consumption is measured in kilograms of oil equivalent.",
+      "Urban population is measured as percentage of total population.",
+      paste(CO2_LABEL, "emissions are measured in metric tons."),
+      "The last column reports the population-weighted averages of the 14 OECD countries in the donor pool."
+    ),
+    note_title = "Notes:"
   ) |>
-  column_spec(1, width = "2.9in") |>
-  column_spec(2:4, width = "0.95in") |>
+  column_spec(1, width = "2.45in") |>
+  column_spec(2:4, width = "0.8in") |>
   identity()
 
 tab2 <- build_synth_weights_table(synth_tables)
 
 kable(tab2, booktabs = TRUE, align = "lclc",
+      longtable = FALSE,
       linesep = "",
-      caption = "Donor-country weights for synthetic Sweden.") |>
-  style_paper_table(note = "Weights sum to 1 by construction.") |>
+      caption = "Country Weights in Synthetic Sweden") |>
+  style_paper_table(
+    note = "With the synthetic control method, extrapolation is not allowed, so all weights are between 0 and 1 and sum to 1.",
+    note_title = "Note:"
+  ) |>
   column_spec(c(1, 3), width = "1.45in") |>
   column_spec(c(2, 4), width = "0.7in")
 
@@ -102,12 +108,48 @@ plot_event_study(es_df)
 sweden_ts <- build_sweden_time_series(analysis_panel)
 rdit_results <- build_rdit_results(sweden_ts)
 
-kable(rdit_results, booktabs = TRUE, align = "ccccc",
-      col.names = c("Poly. Degree ($n$)", "$\\hat{\\alpha}$",
-                    "Robust SE", "$t$-stat", "$p$-value"),
-      escape = FALSE,
-      linesep = "",
-      caption = "RDiT estimates for polynomial degrees $n = 1, \\ldots, 9$. Robust (HC1) standard errors throughout.") |>
+rdit_col_names <- if (knitr::is_latex_output()) {
+  c(
+    "\\makecell[c]{Poly. Degree\\\\($n$)}",
+    "$\\hat{\\alpha}$",
+    "\\makecell[c]{Robust\\\\SE}",
+    "$t$-stat",
+    "$p$-value"
+  )
+} else {
+  c(
+    "Poly. Degree ($n$)",
+    "$\\hat{\\alpha}$",
+    "Robust SE",
+    "$t$-stat",
+    "$p$-value"
+  )
+}
+
+rdit_table <- if (knitr::is_latex_output()) {
+  kbl(
+    rdit_results,
+    format = "latex",
+    booktabs = TRUE,
+    align = "ccccc",
+    col.names = rdit_col_names,
+    escape = FALSE,
+    linesep = "",
+    caption = "RDiT estimates for polynomial degrees $n = 1, \\ldots, 9$. Robust (HC1) standard errors throughout."
+  )
+} else {
+  kable(
+    rdit_results,
+    booktabs = TRUE,
+    align = "ccccc",
+    col.names = rdit_col_names,
+    escape = FALSE,
+    linesep = "",
+    caption = "RDiT estimates for polynomial degrees $n = 1, \\ldots, 9$. Robust (HC1) standard errors throughout."
+  )
+}
+
+rdit_table |>
   style_paper_table()
 
 sweden_ts <- add_rdit_fits(sweden_ts)

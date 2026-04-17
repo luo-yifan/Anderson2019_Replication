@@ -91,7 +91,7 @@ ate_synth <- gap_data %>%
   filter(year %in% POST_TREATMENT_YEARS) %>%
   summarise(ATE = mean(gap))
 
-cat("\n--- Synthetic Control Average Treatment Effect (1991–2005) ---\n")
+cat("\n--- Synthetic Control Average Treatment Effect (1990–2005) ---\n")
 cat(sprintf("ATE = %.4f metric tons CO2 per capita\n", ate_synth$ATE))
 
 # ============================================================
@@ -102,7 +102,6 @@ analysis_panel <- add_panel_indicators(analysis)
 
 # ---------- 3(a): TWFE with four SE types ----------
 did_results <- build_did_results(analysis_panel)
-twfe_feols <- did_results$model
 did_table <- did_results$table
 
 cat("\n--- DiD: TWFE Estimates with Alternative Standard Errors ---\n")
@@ -158,7 +157,7 @@ cat(sprintf("RDiT α̂ (n=9): %.4f  (SE = %.4f)\n",
 cat("\n============================================================")
 cat("\n SUMMARY OF TREATMENT EFFECT ESTIMATES")
 cat("\n============================================================\n")
-cat(sprintf("Synthetic Control ATE (1991–2005):   %.4f\n", ate_synth$ATE))
+cat(sprintf("Synthetic Control ATE (1990–2005):   %.4f\n", ate_synth$ATE))
 cat(sprintf("DiD TWFE α̂ (conventional SE):        %.4f\n",
             did_table$Estimate[1]))
 cat(sprintf("RDiT α̂ (n=7):                        %.4f\n", rdit_ate7$estimate))
